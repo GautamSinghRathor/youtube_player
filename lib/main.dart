@@ -1,4 +1,8 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 void main() {
   runApp(MyApp());
@@ -13,54 +17,145 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      debugShowCheckedModeBanner: false,
+      home: YoutubeScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  final String title;
+class YoutubeScreen extends StatefulWidget {
+  YoutubeScreen({Key key}) : super(key: key);
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _YoutubeScreenState createState() => _YoutubeScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _YoutubeScreenState extends State<YoutubeScreen> {
+  YoutubePlayerController controller;
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  @override
+  void initState() {
+    controller = YoutubePlayerController(
+      initialVideoId: 'nPt8bK2gbaU',
+      params: const YoutubePlayerParams(
+        showControls: true,
+        showFullscreenButton: true,
+        privacyEnhanced: true,
+      ),
+    );
+
+    controller.onEnterFullscreen = () {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    };
+
+    controller.onExitFullscreen = () {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      Future.delayed(Duration(seconds: 1), () {
+        controller.play();
+      });
+      Future.delayed(const Duration(seconds: 5), () {
+        SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+      });
+      log('Exited FullScreen');
+    };
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    controller.close();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    const player = YoutubePlayerIFrame(
+      aspectRatio: 16 / 9,
+    );
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
+        appBar: AppBar(
+          centerTitle: true,
+          title: const Text('Youtube Player'),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
+        body: YoutubePlayerControllerProvider(
+          controller: controller,
+          child: YoutubeValueBuilder(
+            controller: controller,
+            builder: (context, value) {
+              return ListView(
+                children: [
+                  player,
+                  playPauseButtonBar(value, context),
+                  // Controls(),
+                ],
+              );
+            },
+          ),
+        )
+        // YoutubePlayerControllerProvider(
+        //   controller: controller,
+        //   child: ListView(
+        //     children: [
+        //       player,
+        //       Controls(),
+        //     ],
+        //   ),
+        // ),
+        );
+  }
+}
+
+class Controls extends StatelessWidget {
+  ///
+  const Controls();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _space,
+          // MetaDataSection(),
+          // _space,
+          // SourceInputSection(),
+          // _space,
+          // PlayPauseButtonBar(),
+          // _space,
+          // VolumeSlider(),
+          // _space,
+          // PlayerStateSection(),
+        ],
       ),
     );
   }
 }
+
+Widget playPauseButtonBar(var value, BuildContext context) {
+  return Row(
+    children: [
+      IconButton(
+        icon: Icon(
+          value.playerState == PlayerState.playing
+              ? Icons.pause
+              : Icons.play_arrow,
+        ),
+        onPressed: value.isReady
+            ? () {
+                value.playerState == PlayerState.playing
+                    ? context.ytController.pause()
+                    : context.ytController.play();
+              }
+            : null,
+      ),
+    ],
+  );
+}
+
+Widget get _space => const SizedBox(height: 10);
